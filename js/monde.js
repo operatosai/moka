@@ -337,7 +337,140 @@ export function creerMonde(scene, etat, qualite) {
     choses[id].maj = () => 0;
     choses[id].absent = true;
   }
-  return { groupe, relief, surface, orienterSur, choses, majTrous };
+
+  const matCr = {
+    pebble: new THREE.MeshStandardMaterial({ color: 0x8e95a2, roughness: 0.82 }),
+    flat_stone: new THREE.MeshStandardMaterial({ color: 0xa39a88, roughness: 0.9 }),
+    crystal_shard: new THREE.MeshStandardMaterial({ color: 0x8fe2ff, emissive: 0x1f7bff, emissiveIntensity: 0.8, roughness: 0.15, metalness: 0.1 }),
+    old_metal_piece: new THREE.MeshStandardMaterial({ color: 0xa9a196, metalness: 0.85, roughness: 0.38 }),
+    trace: new THREE.MeshStandardMaterial({ color: 0x2a2a33, roughness: 1 }),
+    terre: new THREE.MeshStandardMaterial({ color: 0x3e2f24, roughness: 1 }),
+    tige: new THREE.MeshStandardMaterial({ color: 0x9ccf6a, emissive: 0x4f9f2a, emissiveIntensity: 0.45, roughness: 0.6 }),
+  };
+  function pierreCr(type, graine, taille) {
+    let m;
+    if (type === 'crystal_shard') { m = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), matCr.crystal_shard); m.scale.set(taille * 0.45, taille * 0.9, taille * 0.45); }
+    else if (type === 'old_metal_piece') { m = new THREE.Mesh(new THREE.BoxGeometry(1, 0.25, 0.6), matCr.old_metal_piece); m.scale.setScalar(taille * 1.1); }
+    else if (type === 'flat_stone') { m = new THREE.Mesh(geoRocher(900 + graine, 0.32), matCr.flat_stone); m.scale.set(taille * 1.25, taille, taille * 1.05); }
+    else { m = new THREE.Mesh(geoRocher(800 + graine, 0.6), matCr.pebble); m.scale.setScalar(taille); }
+    m.castShadow = m.receiveShadow = true;
+    return m;
+  }
+  function chemin(motif) {
+    const P = [];
+    if (motif === 'spiral') for (let i = 0; i <= 120; i++) { const a = i / 120 * Math.PI * 6, r = 0.03 + 0.25 * i / 120; P.push([Math.cos(a) * r, Math.sin(a) * r]); }
+    else if (motif === 'star') for (let i = 0; i <= 10; i++) { const a = i / 10 * Math.PI * 2 - Math.PI / 2, r = i % 2 ? 0.12 : 0.3; P.push([Math.cos(a) * r, Math.sin(a) * r]); }
+    else if (motif === 'circle') for (let i = 0; i <= 64; i++) { const a = i / 64 * Math.PI * 2; P.push([Math.cos(a) * 0.26, Math.sin(a) * 0.26]); }
+    else if (motif === 'wave') for (let i = 0; i <= 80; i++) { const x = -0.32 + 0.64 * i / 80; P.push([x, Math.sin(x * 22) * 0.07]); }
+    else if (motif === 'arrow') { P.push([-0.3, 0], [0.3, 0], null, [0.14, -0.13], [0.3, 0], [0.14, 0.13]); }
+    else if (motif === 'eye') {
+      for (let i = 0; i <= 40; i++) { const x = -0.32 + 0.64 * i / 40; P.push([x, 0.15 * Math.sin(Math.PI * i / 40)]); }
+      P.push(null);
+      for (let i = 0; i <= 40; i++) { const x = -0.32 + 0.64 * i / 40; P.push([x, -0.15 * Math.sin(Math.PI * i / 40)]); }
+      P.push(null);
+      for (let i = 0; i <= 32; i++) { const a = i / 32 * Math.PI * 2; P.push([Math.cos(a) * 0.065, Math.sin(a) * 0.065]); }
+    }
+    return P;
+  }
+  function trace(motif) {
+    const g = new THREE.Group();
+    let seg = [];
+    const fin = () => {
+      if (seg.length > 1) {
+        const courbe = new THREE.CatmullRomCurve3(seg.map(([x, z]) => new THREE.Vector3(x, 0.004, z)), false, 'catmullrom', motif === 'star' || motif === 'arrow' ? 0 : 0.5);
+        const m = new THREE.Mesh(new THREE.TubeGeometry(courbe, Math.max(8, seg.length * 3), 0.011, 5, false), matCr.trace);
+        m.scale.y = 0.35; m.receiveShadow = true; g.add(m);
+      }
+      seg = [];
+    };
+    for (const p of chemin(motif)) { if (p) seg.push(p); else fin(); }
+    fin();
+    return g;
+  }
+  function construireCreation(c) {
+    const g = new THREE.Group(); g.name = c.id;
+    const objs = c.objets || [], gr = c.graine_deco || 1;
+    const r = alea(gr);
+    if (c.forme === 'pile') {
+      let y = 0;
+      objs.forEach((o, i) => { const s = Math.max(0.045, 0.1 - i * 0.006); const m = pierreCr(o, gr + i, s); m.position.set((r() - 0.5) * 0.02, y + s * 0.4, (r() - 0.5) * 0.02); m.rotation.y = r() * 6; g.add(m); y += s * (o === 'flat_stone' ? 0.55 : 0.75); });
+    } else if (c.forme === 'circle') {
+      const R = 0.16 + 0.03 * objs.length;
+      objs.forEach((o, i) => { const a = i / objs.length * Math.PI * 2; const m = pierreCr(o, gr + i, 0.06); m.position.set(Math.cos(a) * R, 0.02, Math.sin(a) * R); m.rotation.y = r() * 6; g.add(m); });
+    } else if (c.forme === 'line') {
+      objs.forEach((o, i) => { const m = pierreCr(o, gr + i, 0.06); m.position.set((i - (objs.length - 1) / 2) * 0.14, 0.02, (r() - 0.5) * 0.03); m.rotation.y = r() * 6; g.add(m); });
+    } else if (c.forme === 'shelter') {
+      const plats = objs.filter((o) => o === 'flat_stone'), autres = objs.filter((o) => o !== 'flat_stone');
+      plats.forEach((o, i) => {
+        const m = pierreCr(o, gr + i, 0.11);
+        if (i < 2) { m.position.set(i ? 0.075 : -0.075, 0.075, 0); m.rotation.set(0, 0, i ? 0.55 : -0.55); m.scale.set(0.11, 0.035, 0.12); }
+        else if (i === 2) { m.position.set(0, 0.16, 0); m.scale.set(0.15, 0.03, 0.14); }
+        else { const a = r() * 6; m.position.set(Math.cos(a) * 0.22, 0.02, Math.sin(a) * 0.22); }
+        g.add(m);
+      });
+      autres.forEach((o, i) => { const m = pierreCr(o, gr + 50 + i, 0.045); const a = i * 1.7 + 0.8; m.position.set(Math.cos(a) * 0.2, 0.02, Math.sin(a) * 0.2); g.add(m); });
+    } else if (c.forme === 'marker') {
+      const o = objs[0] || 'flat_stone';
+      const m = pierreCr(o, gr, 0.1);
+      if (o === 'old_metal_piece') { m.rotation.set(Math.PI / 2, 0, 0.1); m.position.y = 0.06; g.add(m); }
+      else { const dr = new THREE.Mesh(geoRocher(950 + gr, 1.0), matCr.flat_stone); dr.castShadow = dr.receiveShadow = true;
+             dr.scale.set(0.075, 0.25, 0.04); dr.position.y = 0.19; dr.rotation.z = 0.06; g.add(dr); }
+      objs.slice(1).forEach((x, i) => { const p = pierreCr(x, gr + 10 + i, 0.045); const a = i * 2.2; p.position.set(Math.cos(a) * 0.12, 0.02, Math.sin(a) * 0.12); g.add(p); });
+    } else if (c.forme === 'drawing') {
+      g.add(trace(c.motif));
+    } else if (c.forme === 'garden') {
+      const motte = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 10), matCr.terre); motte.scale.y = 0.28; motte.receiveShadow = true; g.add(motte);
+      const pousse = new THREE.Group(); g.add(pousse); g.userData.pousse = pousse;
+      const tige = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.01, 0.3, 6), matCr.tige); tige.position.y = 0.15; pousse.add(tige);
+      for (let i = 0; i < 4; i++) {
+        const f = new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 6), matCr.tige); f.scale.set(1, 0.18, 0.5);
+        const a = i * 2.4; f.position.set(Math.cos(a) * 0.04, 0.12 + i * 0.05, Math.sin(a) * 0.04); f.rotation.y = -a; f.rotation.z = 0.5; pousse.add(f);
+      }
+    }
+
+    const d = new THREE.Vector3(...c.dir).normalize();
+    const Z = new THREE.Vector3(...(c.cap || [0, 0, 1])); Z.addScaledVector(d, -Z.dot(d));
+    if (Z.lengthSq() < 1e-8) Z.set(1, 0, 0).addScaledVector(d, -d.x);
+    Z.normalize(); const X = new THREE.Vector3().crossVectors(d, Z).normalize();
+    g.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, d, Z));
+    g.position.copy(surface(d, -0.005));
+
+    const h0 = relief.h(d), q = g.quaternion, centre = g.position.clone();
+    const hauteurIci = (loc) => relief.h(centre.clone().add(loc.clone().applyQuaternion(q)).normalize()) - h0;
+    g.traverse((o) => {
+      if (!o.isMesh || o === g) return;
+      if (c.forme === 'drawing') {
+        const pa = o.geometry.attributes.position, v = new THREE.Vector3();
+        for (let i = 0; i < pa.count; i++) { v.fromBufferAttribute(pa, i); const y0 = v.y; v.y = 0; pa.setY(i, y0 + hauteurIci(v) / o.scale.y); }
+        pa.needsUpdate = true; o.geometry.computeVertexNormals();
+      } else if (o.parent === g) {
+        o.position.y += hauteurIci(new THREE.Vector3(o.position.x, 0, o.position.z));
+      }
+    });
+    g.userData.cle = c.forme + '|' + (c.objets || []).join(',') + '|' + (c.motif || '');
+    g.userData.apparu = 0;
+    return g;
+  }
+  const crGroupe = new THREE.Group(); groupe.add(crGroupe);
+  const crMeshes = new Map();
+  function majCreations(liste, dt) {
+    const vus = new Set();
+    for (const c of liste || []) {
+      vus.add(c.id);
+      let g = crMeshes.get(c.id);
+      const cle = c.forme + '|' + (c.objets || []).join(',') + '|' + (c.motif || '');
+      if (g && g.userData.cle !== cle) { const a = g.userData.apparu; crGroupe.remove(g); g = construireCreation(c); g.userData.apparu = a; crGroupe.add(g); crMeshes.set(c.id, g); }
+      if (!g) { g = construireCreation(c); crGroupe.add(g); crMeshes.set(c.id, g); }
+      g.userData.apparu += (1 - g.userData.apparu) * (1 - Math.exp(-2.5 * dt));
+      const a = g.userData.apparu; g.scale.setScalar(a < 0.999 ? a * (1 + 0.15 * Math.sin(a * Math.PI)) : 1);
+      if (g.userData.pousse) { const k = Math.max(0.001, c.croissance || 0); g.userData.pousse.scale.setScalar(0.15 + 0.85 * k); g.userData.pousse.visible = k > 0.08; }
+      g.userData.nom = c.nom;
+    }
+    for (const [id, g] of crMeshes) if (!vus.has(id)) { crGroupe.remove(g); crMeshes.delete(id); }
+    return crMeshes;
+  }
+
+  return { groupe, relief, surface, orienterSur, choses, majTrous, majCreations };
 }
 
 export function creerCiel(scene, qualite) {

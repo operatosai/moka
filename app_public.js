@@ -180,6 +180,7 @@ renderer.setAnimationLoop(() => {
   monde.choses.soft_soil.maj(srv, dt, temps);
   monde.choses.metal_piece.maj(srv, dt, temps);
   monde.majTrous(srv.moka.trous);
+  const crs = monde.majCreations(pub.monde.creations || [], dt);
   M.maj(dt, { anim: sim.anim, phaseMarche: sim.phaseMarche, tempsAction: sim.t, lumiere: pub.moka.lumiere, graine: pub.moka.graine_en_main,
               porte: false, dureeAction: sim.duree, hauteurTas, deuxMains: false, regardYaw, regardPoids: ech && sim.anim !== 'marche' ? 1 : 0 });
   ciel.mat.uniforms.uTemps.value = temps;
@@ -207,8 +208,25 @@ renderer.setAnimationLoop(() => {
   lumDos.position.copy(tete).addScaledVector(vc, -0.9).addScaledVector(haut, 0.35); lumDos.intensity = 0.3 + 0.2 * nuit;
   CONTOUR.force.value = 0.6 + 0.25 * nuit;
   renderer.render(scene, camera);
+  majEtiquettes(crs);
   if (Math.floor(temps * 2) !== Math.floor((temps - dt) * 2)) majHorloge();
 });
+
+// étiquettes : le nom que Moka a donné à ce qu'il a fait
+const etiquettes = new Map();
+function majEtiquettes(meshes) {
+  for (const [id, g] of meshes) {
+    let e = etiquettes.get(id);
+    if (!e) { e = document.createElement('div'); e.className = 'etiquette'; document.body.appendChild(e); etiquettes.set(id, e); }
+    if (e.textContent !== g.userData.nom) e.textContent = g.userData.nom;
+    const p = g.getWorldPosition(new THREE.Vector3()), n = p.clone().normalize(), vc = camera.position.clone().sub(p);
+    const ndc = p.clone().addScaledVector(n, 0.35).project(camera);
+    const ok = vc.length() < 9 && vc.normalize().dot(n) > 0.05 && ndc.z < 1 && Math.abs(ndc.x) < 1 && Math.abs(ndc.y) < 1;
+    e.style.opacity = ok ? 0.92 : 0;
+    if (ok) { e.style.left = ((ndc.x + 1) / 2 * innerWidth) + 'px'; e.style.top = ((1 - ndc.y) / 2 * innerHeight) + 'px'; }
+  }
+  for (const [id, e] of etiquettes) if (!meshes.has(id)) { e.remove(); etiquettes.delete(id); }
+}
 
 // ------------------------------------------------------------------ panneau
 const $ = (id) => document.getElementById(id);
@@ -227,6 +245,10 @@ function majPanneau() {
   $('lumiere').style.width = Math.round(100 * Math.max(0, Math.min(1, pub.moka.lumiere))) + '%';
   $('journal').innerHTML = (pub.journal || []).slice().reverse().map((j) =>
     `<li><span class="quand">Day ${esc(j.jour)}, ${esc(j.heure)}</span> ${esc(j.texte)}</li>`).join('');
+  const faits = pub.creations || [];
+  $('creations').hidden = !faits.length;
+  $('listeCreations').innerHTML = faits.slice().reverse().map((c) =>
+    `<li><strong>“${esc(c.nom)}”</strong> <span class="quand">${esc(c.quoi)} · Day ${esc(c.jour)}</span></li>`).join('');
   const min = Math.round(ageS() / 60);
   $('fraicheur').textContent = min < 2 ? 'updated just now' : min < 120 ? `updated ${min} min ago` : `updated ${Math.round(min / 60)} h ago`;
   majHorloge();

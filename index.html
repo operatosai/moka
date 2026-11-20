@@ -33,6 +33,12 @@
   #journal { list-style: none; margin: 0; padding: 0 14px 12px; overflow-y: auto; font-size: 13px; }
   #journal li { padding: 7px 0; border-top: 1px solid var(--ligne); }
   .quand { display: block; color: var(--doux); font-size: 11px; }
+  #creations { padding: 0 14px 6px; }
+  #creations h3 { margin: 0 0 4px; font-size: 13px; color: var(--orange); }
+  #listeCreations { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+  #listeCreations li { padding: 3px 0; }
+  .etiquette { position: fixed; transform: translate(-50%, -100%); padding: 2px 8px; border-radius: 999px; background: rgba(12, 12, 18, 0.72);
+    color: #f6ead6; font: 600 12px/1.4 system-ui, sans-serif; pointer-events: none; white-space: nowrap; opacity: 0; transition: opacity .4s; }
   footer { position: fixed; left: 50%; transform: translateX(-50%); bottom: 14px; padding: 9px 16px; font-size: 14px; white-space: nowrap; }
   footer a { color: var(--orange); text-decoration: none; font-weight: 600; }
   footer a:hover { text-decoration: underline; }
@@ -66,6 +72,7 @@
 
 <aside class="carte" id="cote">
   <header><h2>Moka's journal</h2><a href="carnet.html">Echo's notebook →</a></header>
+  <div id="creations" hidden><h3>Things Moka made</h3><ul id="listeCreations"></ul></div>
   <ul id="journal"></ul>
 </aside>
 
