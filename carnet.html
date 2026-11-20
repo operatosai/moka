@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Echo's notebook</title>
+<link rel="icon" href="echo.png">
+<style>
+  :root { --fond: #0f0d12; --carte: #1a1720; --texte: #ece6dc; --doux: #a89f92; --or: #f2b65a; --cite: #ffd89a; --ligne: #2d2833; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fond); color: var(--texte); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { max-width: 820px; margin: 0 auto; padding: 32px 16px 8px; }
+  h1 { margin: 0; font-size: 28px; letter-spacing: .3px; }
+  .sous { color: var(--doux); margin: 6px 0 0; font-size: 14px; }
+  .sous a { color: var(--or); }
+  main { max-width: 820px; margin: 0 auto; padding: 8px 16px 64px; }
+  article { background: var(--carte); border: 1px solid var(--ligne); border-radius: 14px; padding: 20px 22px; margin: 22px 0; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; color: var(--doux); font-size: 13px; margin-bottom: 6px; }
+  .relire { background: #5a2a1a; color: #ffc9a8; border-radius: 999px; padding: 2px 10px; font-weight: 600; }
+  .verifie { color: #9fd59a; }
+  .images { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin: 12px 0 6px; }
+  .images img { width: 100%; border-radius: 10px; display: block; background: #000; }
+  article h2 { font-size: 21px; margin: 6px 0 10px; }
+  article h3 { font-size: 15px; text-transform: uppercase; letter-spacing: .8px; color: var(--or); margin: 18px 0 6px; }
+  article p { margin: 8px 0; }
+  article ul { margin: 6px 0; padding-left: 22px; }
+  article li { margin: 4px 0; }
+  q, .citation { color: var(--cite); }
+  blockquote { margin: 10px 0; padding: 4px 14px; border-left: 3px solid var(--or); color: var(--cite); }
+  .vide { color: var(--doux); text-align: center; padding: 40px 0; }
+  .pied { text-align: center; color: var(--doux); padding: 0 16px 40px; }
+  .pied a { color: var(--or); font-weight: 600; text-decoration: none; }
+  code { background: #00000055; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Echo's field notes</h1>
+  <p class="sous">A nature documentary about Moka, written by Echo from Moka's own journal. Every quote is checked word for word.
+    · <a href="index.html">back to Moka's world</a></p>
+</header>
+<main id="liste"><p class="vide">Loading…</p></main>
+<p class="pied">What do you think Moka is? <a href="https://www.youtube.com/@aitestsai" target="_blank" rel="noopener">Tell us on YouTube</a></p>
+<script>
+const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+function enLigne(s) {
+  s = esc(s);
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // liens : seulement vers les clips du caméraman (/rushes/…)
+  s = s.replace(/\[([^\]]+)\]\((\/rushes\/[\w\-\/.]+\.mp4)\)/g, '<a href="$2" target="_blank">$1</a>');
+  // citations de Moka (entre guillemets droits ou typographiques)
+  s = s.replace(/"([^"]+)"/g, '<span class="citation">“$1”</span>').replace(/“([^”]+)”/g, '<span class="citation">“$1”</span>');
+  return s;
+}
+function md(txt) {
+  const out = []; let liste = false;
+  const fermer = () => { if (liste) { out.push('</ul>'); liste = false; } };
+  for (const l of txt.split('\n')) {
+    if (/^!\[[^\]]*\]\([^)]*\)/.test(l)) continue;           // images : affichées à part
+    if (/^---\s*$/.test(l)) { fermer(); out.push('<hr style="border:0;border-top:1px solid var(--ligne);margin:16px 0">'); continue; }
+    if (/^# /.test(l)) { fermer(); continue; }                 // titre : déjà dans l'en-tête de la carte
+    const clip = l.match(/\((\/rushes\/[\w\-\/.]+\.mp4)\)/);
+    if (clip) { fermer(); out.push('<p>' + enLigne(l) + '</p><video controls preload="metadata" playsinline src="' + clip[1] + '" style="width:100%;border-radius:10px;background:#000"></video>'); continue; }
+    if (/^## /.test(l)) { fermer(); out.push('<h3>' + enLigne(l.slice(3)) + '</h3>'); continue; }
+    if (/^### /.test(l)) { fermer(); out.push('<h3>' + enLigne(l.slice(4)) + '</h3>'); continue; }
+    if (/^\s*[-*] /.test(l)) { if (!liste) { out.push('<ul>'); liste = true; } out.push('<li>' + enLigne(l.replace(/^\s*[-*] /, '')) + '</li>'); continue; }
+    if (/^> /.test(l)) { fermer(); out.push('<blockquote>' + enLigne(l.slice(2)) + '</blockquote>'); continue; }
+    if (!l.trim()) { fermer(); continue; }
+    fermer(); out.push('<p>' + enLigne(l) + '</p>');
+  }
+  fermer();
+  return out.join('\n');
+}
+fetch('carnet/pages.json', { cache: 'no-store' }).then((r) => r.json()).then(({ entrees }) => {
+  const L = document.getElementById('liste');
+  if (!entrees.length) { L.innerHTML = '<p class="vide">No entry yet. Echo is still watching.</p>'; return; }
+  L.innerHTML = '';
+  for (const e of entrees) {
+    const a = document.createElement('article');
+    const titre = ((e.texte || '').match(/^# (.+)$/m) || [, e.titre || 'Field note'])[1];
+    const statut = e.statut === 'a_relire' ? '<span class="relire">to review</span>'
+      : `<span class="verifie">✓ ${e.citations || 0} quote${(e.citations || 0) === 1 ? '' : 's'} checked</span>`;
+    a.innerHTML = `<div class="meta"><span>${esc(e.date_affichee || e.heure || '')}</span><span>${e.decisions} decision${e.decisions === 1 ? '' : 's'} read</span>${statut}</div>
+      <h2>${enLigne(titre)}</h2>
+      <div class="images">${(e.images || []).map((i) => `<img loading="lazy" src="carnet/${encodeURIComponent(i)}" alt="">`).join('')}</div>
+      ${md(e.texte || '')}`;
+    L.appendChild(a);
+  }
+}).catch(() => { document.getElementById('liste').innerHTML = '<p class="vide">The notebook could not be read.</p>'; });
+</script>
+</body>
+</html>

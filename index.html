@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Moka</title>
+<meta name="description" content="Moka lives alone on a tiny asteroid. Another AI decides what he does. Watch him live.">
+<link rel="icon" href="echo.png">
+<style>
+  :root { --fond: #07080d; --carte: rgba(14, 16, 24, 0.74); --ligne: rgba(255, 255, 255, 0.1); --texte: #ece6dc; --doux: #a59f95; --orange: #f2a65a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--fond); color: var(--texte); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .chargement { position: fixed; inset: 0; display: grid; place-items: center; color: var(--doux); transition: opacity 1.2s; pointer-events: none; }
+  .carte { position: fixed; background: var(--carte); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--ligne); border-radius: 14px; }
+  #haut { top: 16px; left: 16px; max-width: min(380px, calc(100vw - 32px)); padding: 14px 16px; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: 0.02em; }
+  h1 small { font-size: 13px; color: var(--doux); font-weight: 400; margin-left: 6px; }
+  #horloge { color: var(--doux); font-size: 13px; margin-top: 2px; }
+  .maintenant { margin-top: 10px; font-size: 13px; color: var(--doux); }
+  #maintenant { color: var(--orange); font-weight: 600; }
+  #intention { margin: 6px 0 0; font-style: italic; }
+  .jauges { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; margin-top: 12px; font-size: 12px; color: var(--doux); }
+  .barre { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+  .barre i { display: block; height: 100%; background: var(--orange); border-radius: 3px; transition: width 1s; }
+  .barre.lum i { background: #ffe2a8; }
+  #fraicheur { margin-top: 10px; font-size: 11px; color: var(--doux); }
+  #cote { top: 16px; right: 16px; width: 330px; max-height: calc(100vh - 100px); display: flex; flex-direction: column; }
+  #cote header { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px 8px; }
+  #cote h2 { margin: 0; font-size: 15px; }
+  #cote a { color: var(--orange); font-size: 13px; text-decoration: none; }
+  #cote a:hover { text-decoration: underline; }
+  #journal { list-style: none; margin: 0; padding: 0 14px 12px; overflow-y: auto; font-size: 13px; }
+  #journal li { padding: 7px 0; border-top: 1px solid var(--ligne); }
+  .quand { display: block; color: var(--doux); font-size: 11px; }
+  footer { position: fixed; left: 50%; transform: translateX(-50%); bottom: 14px; padding: 9px 16px; font-size: 14px; white-space: nowrap; }
+  footer a { color: var(--orange); text-decoration: none; font-weight: 600; }
+  footer a:hover { text-decoration: underline; }
+  @media (max-width: 760px) {
+    h1 small { display: block; margin: 2px 0 0; font-size: 12px; }
+    #haut { top: 12px; left: 12px; right: 12px; max-width: none; padding: 12px 14px; }
+    #cote { top: auto; right: 12px; left: 12px; bottom: 62px; width: auto; max-height: 30vh; }
+    footer { bottom: 12px; left: 12px; right: 12px; transform: none; white-space: normal; text-align: center; font-size: 13px; }
+    .jauges { margin-top: 8px; }
+  }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/jsm/" } }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="chargement" id="chargement">Moka's world is loading…</div>
+
+<section class="carte" id="haut">
+  <h1>Moka <small>a small creature alone on an asteroid</small></h1>
+  <div id="horloge">…</div>
+  <div class="maintenant">Right now: <span id="maintenant">…</span></div>
+  <p id="intention"></p>
+  <div class="jauges">
+    <span>Energy</span><div class="barre"><i id="energie" style="width:0"></i></div>
+    <span>His little light</span><div class="barre lum"><i id="lumiere" style="width:0"></i></div>
+  </div>
+  <div id="fraicheur"></div>
+</section>
+
+<aside class="carte" id="cote">
+  <header><h2>Moka's journal</h2><a href="carnet.html">Echo's notebook →</a></header>
+  <ul id="journal"></ul>
+</aside>
+
+<footer class="carte">What do you think Moka is? <a href="https://www.youtube.com/@aitestsai" target="_blank" rel="noopener">Tell us on YouTube</a></footer>
+
+<script type="module" src="app_public.js"></script>
+</body>
+</html>
