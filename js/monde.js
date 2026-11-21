@@ -520,16 +520,77 @@ export function creerCiel(scene, qualite) {
   return { ciel, mat };
 }
 
-export function creerSoleil(scene, dir) {
+export function creerSoleil(scene, dir, etoile) {
   const g = new THREE.Group(); scene.add(g);
   const d = new THREE.Vector3(...dir).normalize();
+  const teinte = new THREE.Color(0xffffff); const tc = new THREE.Color(0xfff4dc), th = new THREE.Color(0xffd9a0);
+  let k = 1;
+  if (etoile && etoile.c) { teinte.setRGB(...etoile.c); k = etoile.t || 1; tc.lerp(teinte, 0.6); th.lerp(teinte, 0.7); }
   const coeur = new THREE.Sprite(new THREE.SpriteMaterial({ map: texLueur('rgba(255,255,255,1)', 'rgba(255,240,210,0.9)'),
-    color: 0xfff4dc, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
-  coeur.scale.setScalar(16); coeur.position.copy(d).multiplyScalar(380); g.add(coeur);
+    color: tc, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  coeur.scale.setScalar(16 * k); coeur.position.copy(d).multiplyScalar(380); g.add(coeur);
   const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: texLueur('rgba(255,220,170,0.6)', 'rgba(255,190,120,0.12)'),
-    color: 0xffd9a0, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
-  halo.scale.setScalar(110); halo.position.copy(coeur.position); g.add(halo);
+    color: th, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
+  halo.scale.setScalar(110 * (0.8 + 0.2 * k)); halo.position.copy(coeur.position); g.add(halo);
   return g;
+}
+
+export function creerLumieres(scene) {
+  const g = new THREE.Group(); scene.add(g);
+  const pool = [];
+  const lueur = texLueur('rgba(255,255,255,1)', 'rgba(255,255,255,0.3)');
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 32;
+  const cx = cv.getContext('2d'); const gr = cx.createLinearGradient(0, 0, 128, 0);
+  gr.addColorStop(0, 'rgba(255,255,255,0.85)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.28)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  cx.fillStyle = gr; cx.fillRect(0, 0, 128, 32);
+  const texQueue = new THREE.CanvasTexture(cv);
+  const masque = document.createElement('canvas'); masque.width = 128; masque.height = 32;
+  const mx = masque.getContext('2d'); mx.drawImage(cv, 0, 0);
+  mx.globalCompositeOperation = 'destination-in';
+  const gy = mx.createLinearGradient(0, 0, 0, 32); gy.addColorStop(0, 'rgba(0,0,0,0)'); gy.addColorStop(0.5, 'rgba(0,0,0,1)'); gy.addColorStop(1, 'rgba(0,0,0,0)');
+  mx.fillStyle = gy; mx.fillRect(0, 0, 128, 32);
+  texQueue.image = masque; texQueue.needsUpdate = true;
+  const mat = (map, c) => new THREE.SpriteMaterial({ map, color: c, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  function nouveau() {
+    const o = { g: new THREE.Group() };
+    o.halo = new THREE.Sprite(mat(lueur, 0xffffff)); o.coeur = new THREE.Sprite(mat(lueur, 0xffffff));
+    o.queue = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: texQueue, transparent: true, blending: THREE.AdditiveBlending,
+      depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    o.queue.visible = false;
+    o.g.add(o.halo, o.coeur, o.queue); g.add(o.g);
+    return o;
+  }
+  const p = new THREE.Vector3(), v = new THREE.Vector3(), c1 = new THREE.Color(), blanc = new THREE.Color(1, 1, 1);
+  const X = new THREE.Vector3(), Y = new THREE.Vector3(), Z = new THREE.Vector3(), B = new THREE.Matrix4();
+  return {
+    maj(ciel, age) {
+      const liste = (ciel && ciel.corps) || [];
+      while (pool.length < liste.length) pool.push(nouveau());
+      pool.forEach((o, i) => {
+        const c = liste[i];
+        o.g.visible = !!c;
+        if (!c) return;
+        p.set(...c.d).addScaledVector(v.set(...c.v), age).normalize();
+        const op = Math.max(0, Math.min(1, c.o));
+        const taille = Math.max(1.8, Math.min(8, 2.0 + (6.0 - c.m) * 0.55)) * (c.f ? 1.25 : 1);
+        o.coeur.position.copy(p).multiplyScalar(376); o.halo.position.copy(o.coeur.position);
+        c1.setRGB(...c.c); o.halo.material.color.copy(c1);
+        o.coeur.material.color.copy(c1).lerp(blanc, 0.4);
+        o.coeur.scale.setScalar(taille); o.halo.scale.setScalar(taille * (c.f ? 5 : 3.2));
+        o.coeur.material.opacity = op * Math.max(0.55, Math.min(1, 0.5 + (6 - c.m) * 0.1));
+        o.halo.material.opacity = op * (c.f ? 0.55 : 0.38);
+        if (c.f && c.q > 0.3) {
+          const L = c.q * 6.5;
+          Z.copy(p); X.set(...c.qd); Y.crossVectors(Z, X).normalize();
+          o.queue.quaternion.setFromRotationMatrix(B.makeBasis(X, Y, Z));
+          o.queue.scale.set(L, taille * 0.9, 1);
+          o.queue.position.copy(o.coeur.position).addScaledVector(X, L / 2);
+          o.queue.material.color.copy(c1).lerp(blanc, 0.3);
+          o.queue.material.opacity = op * 0.55; o.queue.visible = true;
+        } else o.queue.visible = false;
+      });
+    },
+  };
 }
 
 export function creerEcho() {

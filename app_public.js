@@ -4,7 +4,7 @@
 // puis a ses petites habitudes (regarder autour, quelques pas, s'étirer, s'asseoir). Le jour tourne en temps réel.
 import * as THREE from 'three';
 import { creerMoka, CONTOUR } from './js/moka3d.js';
-import { creerMonde, creerCiel, creerSoleil, creerEcho } from './js/monde.js';
+import { creerMonde, creerCiel, creerSoleil, creerLumieres, creerEcho } from './js/monde.js';
 
 const mobile = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 600;
 const qualite = mobile
@@ -27,15 +27,15 @@ const asteroide = new THREE.Group(); scene.add(asteroide);
 
 // ------------------------------------------------------------------ état publié
 let pub = null, recuA = 0;            // recuA : performance.now() à la réception
-let M = null, monde = null, ciel = null, echo = null, construit = false, lumPerso = null, lumDos = null;
+let M = null, monde = null, ciel = null, echo = null, construit = false, lumPerso = null, lumDos = null, lumieres = null;
 const ACTION_TEXTE = {
   go_to: 'walking', explore: 'exploring', look: 'looking at something', sit: 'sitting', dig: 'digging',
-  raise_light: 'raising his little light', sleep: 'sleeping', wave: 'waving',
+  raise_light: 'raising his little light', sleep: 'sleeping', wave: 'waving', observe_sky: 'watching the sky',
   attente_regard: 'looking around', attente_pas: 'taking a few steps', attente_assis: 'resting a moment',
   attente_etire: 'stretching', surpris: 'startled',
 };
 const ANIM = { go_to: 'marche', explore: 'marche', look: 'regarde', sit: 'assis', dig: 'creuse', raise_light: 'leve', sleep: 'dort',
-  wave: 'salue', attente_regard: 'regarde', attente_pas: 'marche', attente_assis: 'assis', attente_etire: 'etire', surpris: 'surpris' };
+  observe_sky: 'regarde', wave: 'salue', attente_regard: 'regarde', attente_pas: 'marche', attente_assis: 'assis', attente_etire: 'etire', surpris: 'surpris' };
 
 async function lire() {
   try {
@@ -72,8 +72,10 @@ function construire() {
   monde = creerMonde(asteroide, { ...pub, monde: pub.monde }, qualite);
   scene.remove(monde.groupe); asteroide.add(monde.groupe);
   ciel = creerCiel(scene, qualite); ciel.mat.uniforms.uPix.value = renderer.getPixelRatio();
-  creerSoleil(scene, pub.soleil);
+  creerSoleil(scene, pub.soleil, pub.ciel && pub.ciel.etoile);
+  lumieres = creerLumieres(scene);
   const sol = new THREE.DirectionalLight(0xfff0da, 2.0);
+  if (pub.ciel && pub.ciel.etoile) sol.color.lerp(new THREE.Color(...pub.ciel.etoile.c), 0.3);
   sol.position.copy(SOL).multiplyScalar(40); sol.castShadow = true; sol.shadow.mapSize.set(qualite.ombre, qualite.ombre);
   const sc = sol.shadow.camera; sc.left = -12; sc.right = 12; sc.top = 12; sc.bottom = -12; sc.near = 20; sc.far = 62;
   sol.shadow.bias = -0.0015; sol.shadow.normalBias = 0.03; scene.add(sol, sol.target);
@@ -159,6 +161,7 @@ renderer.setAnimationLoop(() => {
   timer.update(); const dt = Math.min(Math.max(timer.getDelta(), 0), 0.1); temps += dt;
   if (!construit || !M) { renderer.render(scene, camera); return; }
   asteroide.rotation.y = rotation();
+  if (lumieres) lumieres.maj(pub.ciel, ageS());
   const dep = majSim(dt);
   if (!initAff) { dirAff.copy(sim.dir); capAff.copy(sim.cap); initAff = true; }
   dirAff.lerp(sim.dir, 1 - Math.exp(-8 * dt)).normalize();
@@ -249,6 +252,11 @@ function majPanneau() {
   $('creations').hidden = !faits.length;
   $('listeCreations').innerHTML = faits.slice().reverse().map((c) =>
     `<li><strong>“${esc(c.nom)}”</strong> <span class="quand">${esc(c.quoi)} · Day ${esc(c.jour)}</span></li>`).join('');
+  const notesCiel = (pub.ciel_notes || []).slice().reverse().map((n) =>
+    `<li>“${esc(n.texte)}” <span class="quand">Day ${esc(n.jour)}, ${esc(n.heure)}</span></li>`);
+  const nomsCiel = (pub.ciel_noms || []).length ? [`<li><span class="quand">Names Moka gave to lights in the sky:</span> ${(pub.ciel_noms || []).map((n) => '“' + esc(n) + '”').join(', ')}</li>`] : [];
+  $('ciel').hidden = !(notesCiel.length || nomsCiel.length);
+  $('listeCiel').innerHTML = nomsCiel.concat(notesCiel).join('');
   const min = Math.round(ageS() / 60);
   $('fraicheur').textContent = min < 2 ? 'updated just now' : min < 120 ? `updated ${min} min ago` : `updated ${Math.round(min / 60)} h ago`;
   majHorloge();
