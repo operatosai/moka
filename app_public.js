@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { creerMoka, CONTOUR } from './js/moka3d.js';
 import { creerMonde, creerCiel, creerSoleil, creerLumieres, creerEcho } from './js/monde.js';
+import { creerPOV } from './js/pov.js';
 
 const mobile = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 600;
 const qualite = mobile
@@ -137,12 +138,26 @@ const echoVisible = () => !!(pub && pub.visite && ageS() < 300);   // Écho seul
 
 // ------------------------------------------------------------------ caméra : suit Moka, se tourne au doigt
 const cam = { yaw: 0.55, pitch: 0.22, dist: mobile ? 4.8 : 4.2, vYaw: 0, touche: -99, pos: new THREE.Vector3(), cible: new THREE.Vector3(), init: false, ref: new THREE.Vector3(0, 0, 1) };
+// ------------------------------------------------------------------ vue « yeux de Moka » (POV), au choix du visiteur
+const pov = creerPOV({ camera, getM: () => M, getAction: () => sim.action });
+const bPov = document.getElementById('bPov');
+pov.surChange = (on) => { bPov.textContent = on ? 'Orbit view' : "MOKA'S POV"; bPov.classList.toggle('on', on); bPov.setAttribute('aria-pressed', on ? 'true' : 'false'); };
+bPov.onclick = () => pov.basculer();
+addEventListener('keydown', (e) => { if ((e.key === 'v' || e.key === 'V') && !e.ctrlKey && !e.metaKey && !e.altKey) pov.basculer(); });
+// le bouton reste au-dessus du journal (sur téléphone le journal est en bas), sans jamais le recouvrir
+function placerBouton() {
+  const c = document.getElementById('cote').getBoundingClientRect();
+  if (innerWidth <= 760) { bPov.style.right = '12px'; bPov.style.left = 'auto'; bPov.style.bottom = Math.round(innerHeight - c.top + 8) + 'px'; }
+  else { bPov.style.left = '16px'; bPov.style.right = 'auto'; bPov.style.bottom = '16px'; }
+}
+addEventListener('resize', placerBouton); setInterval(placerBouton, 1500); placerBouton();
 const doigts = new Map(); let pinch0 = 0;
 canvas.addEventListener('pointerdown', (e) => { canvas.setPointerCapture(e.pointerId); doigts.set(e.pointerId, { x: e.clientX, y: e.clientY }); cam.touche = temps; });
 canvas.addEventListener('pointerup', (e) => { doigts.delete(e.pointerId); pinch0 = 0; });
 canvas.addEventListener('pointercancel', (e) => { doigts.delete(e.pointerId); pinch0 = 0; });
 canvas.addEventListener('pointermove', (e) => {
   const p = doigts.get(e.pointerId); if (!p) return;
+  if (doigts.size === 2 && pov.voulu) { p.x = e.clientX; p.y = e.clientY; return; }
   if (doigts.size === 2) {
     const [a, b] = [...doigts.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
     p.x = e.clientX; p.y = e.clientY;
@@ -150,9 +165,10 @@ canvas.addEventListener('pointermove', (e) => {
     if (pinch0) cam.dist = Math.max(1.6, Math.min(14, cam.dist * pinch0 / d2)); pinch0 = d2 || d; return;
   }
   const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+  if (pov.voulu) { pov.glisser(dx, dy); return; }
   cam.yaw -= dx * 0.0065; cam.pitch = Math.max(0.02, Math.min(1.3, cam.pitch + dy * 0.0065)); cam.touche = temps;
 });
-canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.dist = Math.max(1.6, Math.min(14, cam.dist * Math.exp(e.deltaY * 0.001))); }, { passive: false });
+canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (pov.voulu) return; cam.dist = Math.max(1.6, Math.min(14, cam.dist * Math.exp(e.deltaY * 0.001))); }, { passive: false });
 
 // ------------------------------------------------------------------ boucle
 let temps = 0; const timer = new THREE.Timer(); timer.connect(document);
@@ -202,6 +218,7 @@ renderer.setAnimationLoop(() => {
   if (!cam.init) { cam.pos.copy(pos); cam.cible.copy(centre); cam.init = true; }
   const k = 1 - Math.exp(-6 * dt); cam.pos.lerp(pos, k); cam.cible.lerp(centre, k);
   camera.position.copy(cam.pos); camera.up.copy(haut); camera.lookAt(cam.cible);
+  pov.maj(dt, false);   // yeux de Moka si choisis : remplace (ou fond avec) la caméra orbitale
 
   // éclairage de personnage (comme sur la page du PC)
   const nuit = Math.max(0, Math.min(1, 0.5 - haut.dot(lumSoleil.clone().normalize()) * 2));

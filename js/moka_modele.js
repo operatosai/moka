@@ -200,7 +200,7 @@ export function habillerModele(sq) {
   let osHanches = null, hanchesRepos = new THREE.Vector3(), kHanches = 1;
   let modele = null;
   const H = { jambes, bras, antennes, graineMat, lueurGraine, lumiere, majYeux, gainLumiere: 1.0,
-    dort: { teteMax: 0.2 }, os: null, modele: null, ajusterPose };
+    dort: { teteMax: 0.2 }, os: null, modele: null, ajusterPose, yeux, povAvant: 0.05 };
 
   H.pret = new Promise((ok, ko) => {
     new GLTFLoader().load(FICHIER_MODELE, (gltf) => {
@@ -444,6 +444,7 @@ export function habillerModele(sq) {
     ancre.position.copy(pC); noeud.position.copy(pN);
     racine.add(ancre); racine.add(noeud); racine.updateMatrixWorld(true);
     if (osTorse) { osTorse.attach(ancre); osTorse.attach(noeud); }
+    H.povAvant = Math.max(0.03, zBord - zY) + 0.035;
     repere = { yeux: new THREE.Vector3(cS.x, yYeux, zBord), collier: pC.clone(), epaule: epauleD, portee: porteeD };
     cordon.visible = true;
   }
